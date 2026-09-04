@@ -168,56 +168,6 @@ func TestExtractBookDelayStopsOnContextCancellation(t *testing.T) {
 	}
 }
 
-func TestExtractBookRejectsGeneratedPageSymlinkWithoutModifyingTarget(t *testing.T) {
-	root := t.TempDir()
-	outputDir := filepath.Join(root, "book")
-	if err := os.Mkdir(outputDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	outside := filepath.Join(t.TempDir(), "outside.md")
-	if err := os.WriteFile(outside, []byte("unchanged"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Symlink(outside, filepath.Join(outputDir, "0001-test-book.md")); err != nil {
-		t.Fatal(err)
-	}
-
-	c, _ := newTestClient(t)
-	_, err := extractBook(context.Background(), c, extractRequest{
-		Identifier: "123", Library: "chem", OutputDir: "book",
-		Format: "markdown", MaxPages: 1, WriteRoot: root,
-	})
-	assertAgentErrorCode(t, err, "INVALID_ARGUMENT")
-	if got, readErr := os.ReadFile(outside); readErr != nil || string(got) != "unchanged" {
-		t.Fatalf("outside target = %q, err = %v", got, readErr)
-	}
-}
-
-func TestExtractBookRejectsIndexSymlinkWithoutModifyingTarget(t *testing.T) {
-	root := t.TempDir()
-	outputDir := filepath.Join(root, "book")
-	if err := os.Mkdir(outputDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	outside := filepath.Join(t.TempDir(), "outside.json")
-	if err := os.WriteFile(outside, []byte("unchanged"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Symlink(outside, filepath.Join(outputDir, "index.json")); err != nil {
-		t.Fatal(err)
-	}
-
-	c, _ := newTestClient(t)
-	_, err := extractBook(context.Background(), c, extractRequest{
-		Identifier: "123", Library: "chem", OutputDir: "book",
-		Format: "markdown", MaxPages: 1, WriteRoot: root,
-	})
-	assertAgentErrorCode(t, err, "INVALID_ARGUMENT")
-	if got, readErr := os.ReadFile(outside); readErr != nil || string(got) != "unchanged" {
-		t.Fatalf("outside target = %q, err = %v", got, readErr)
-	}
-}
-
 func TestDownloadPDFReturnsPathAndByteCount(t *testing.T) {
 	c, _ := newTestClient(t)
 	out := filepath.Join(t.TempDir(), "book.pdf")
@@ -229,26 +179,6 @@ func TestDownloadPDFReturnsPathAndByteCount(t *testing.T) {
 	}
 	if result.OutputFile != out || result.Bytes != int64(len("%PDF-1.4 test")) {
 		t.Fatalf("download result = %+v", result)
-	}
-}
-
-func TestDownloadPDFRejectsFinalSymlinkWithoutModifyingTarget(t *testing.T) {
-	root := t.TempDir()
-	outside := filepath.Join(t.TempDir(), "outside.pdf")
-	if err := os.WriteFile(outside, []byte("unchanged"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Symlink(outside, filepath.Join(root, "book.pdf")); err != nil {
-		t.Fatal(err)
-	}
-
-	c, _ := newTestClient(t)
-	_, err := downloadPDF(context.Background(), c, downloadRequest{
-		Identifier: "123", Library: "chem", OutputFile: "book.pdf", WriteRoot: root,
-	})
-	assertAgentErrorCode(t, err, "INVALID_ARGUMENT")
-	if got, readErr := os.ReadFile(outside); readErr != nil || string(got) != "unchanged" {
-		t.Fatalf("outside target = %q, err = %v", got, readErr)
 	}
 }
 

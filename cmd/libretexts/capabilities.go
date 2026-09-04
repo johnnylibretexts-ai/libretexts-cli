@@ -113,14 +113,6 @@ var canonicalCapabilities = capabilityManifest{
 			Options:     []optionCapability{{Name: "--json", Type: "boolean", Description: "emit the versioned capability manifest", Default: false}},
 			OutputModes: []string{"human", "json"}, ResultShape: "versioned command capability manifest", UsesNetwork: false, WritesFiles: false,
 		},
-		{
-			Name: "serve", Synopsis: "serve --mcp", Summary: "run the local MCP server",
-			Options: []optionCapability{
-				{Name: "--mcp", Type: "boolean", Description: "serve the Model Context Protocol over stdio", Default: false, Required: true},
-				{Name: "--write-root", Type: "string", Description: "enable file-writing MCP tools within this directory", Default: ""},
-			},
-			OutputModes: []string{"mcp"}, ResultShape: "stdio Model Context Protocol server", UsesNetwork: true, WritesFiles: true,
-		},
 	},
 }
 

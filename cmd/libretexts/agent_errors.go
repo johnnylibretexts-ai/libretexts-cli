@@ -92,6 +92,10 @@ func newCommandFlagSet(name string, jsonErrors bool) *flag.FlagSet {
 	return fs
 }
 
+func filesystemError(err error) *agentError {
+	return newAgentError("FILESYSTEM_ERROR", err.Error(), "Check the target path and its permissions, then retry.", false, err)
+}
+
 func invalidArgumentError(command string, err error) *agentError {
 	hint := "Check the command arguments and retry."
 	if command != "" {

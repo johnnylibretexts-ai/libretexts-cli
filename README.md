@@ -45,7 +45,7 @@ The Commons catalog, Deki tree traversal, and fallback behavior were cross-check
 ./libretexts pdf chem-38132 --out Chemistry_1e.pdf
 ```
 
-## Agent and MCP interfaces
+## Agent interface
 
 Discover the current, versioned command manifest without accessing the
 network or writing files:
@@ -57,7 +57,7 @@ libretexts describe --json
 It emits JSON with `schema_version: "1"`, the global `--json-errors` option,
 and every command's synopsis, options, output modes, network use, and
 file-writing behavior. For example, the manifest reports `describe` as a
-network-free, non-writing command and `serve` as an MCP command.
+network-free, non-writing command.
 
 Use `--json-errors` when an automation needs exactly one error object on
 standard error. A bare numeric page ID intentionally fails because it has no
@@ -80,50 +80,6 @@ text is capped at 6,000 characters:
 
 ```bash
 libretexts page chem-38132 --json --content text --max-chars 6000
-```
-
-Start the local MCP server over stdio with its read-only tool set:
-
-```bash
-libretexts serve --mcp
-```
-
-That server exposes four read-only tools: `libretexts_list_libraries`,
-`libretexts_search_books`, `libretexts_get_page`, and
-`libretexts_get_tree`. It does not expose extract or PDF-download tools.
-
-To opt into file-writing tools, choose a directory that the server may use:
-
-```bash
-libretexts serve --mcp --write-root ./libretexts-output
-```
-
-With `--write-root`, the MCP server additionally exposes
-`libretexts_extract_book` and `libretexts_download_pdf`. Their output paths
-are relative to, and confined beneath, that root. Both MCP modes may make
-network requests to LibreTexts when a tool is called; starting the server does
-not itself fetch content.
-
-The write-root checks reject absolute output paths, lexical traversal, and
-existing symbolic links in requested output paths. This is a pathname safety
-boundary, not a hardened concurrent-filesystem guarantee: writes use ordinary
-path operations rather than dirfd/no-follow operations, so a concurrent
-replacement after validation is not prevented. Existing regular
-files may be replaced, and replacement is not guaranteed to be atomic.
-
-An MCP host configuration should use the absolute path of an already installed
-binary. For example, this is an installation-time configuration, separate from
-building this source checkout (and does not assert that this path exists here):
-
-```json
-{
-  "mcpServers": {
-    "libretexts": {
-      "command": "/opt/homebrew/bin/libretexts",
-      "args": ["serve", "--mcp"]
-    }
-  }
-}
 ```
 
 ## Verification

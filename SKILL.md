@@ -131,7 +131,7 @@ All commands accept:
 - **Canvas Course Integration**: When converting LibreTexts chapters into Canvas LMS pages with `canvas-pp-cli`, use `--format html` to preserve MathJax markup, diagrams, and formatting.
 - **Machine Processing**: Add `--json` to `search`, `page`, `tree`, and `libraries` for structured agent processing.
 
-## Agent Discovery, Errors, and MCP
+## Agent Discovery and Errors
 
 Discover the versioned interface without network or file writes:
 
@@ -156,44 +156,4 @@ empty because text was selected:
 
 ```bash
 libretexts page chem-38132 --json --content text --max-chars 6000
-```
-
-Run the MCP server over stdio with only four read-only tools
-(`libretexts_list_libraries`, `libretexts_search_books`,
-`libretexts_get_page`, and `libretexts_get_tree`):
-
-```bash
-libretexts serve --mcp
-```
-
-`extract` and PDF-download MCP tools are deliberately omitted until a confined
-write root is supplied:
-
-```bash
-libretexts serve --mcp --write-root ./libretexts-output
-```
-
-The latter additionally exposes `libretexts_extract_book` and
-`libretexts_download_pdf`; output paths must be relative to that root. MCP
-tool calls may access LibreTexts, but starting the server does not fetch
-content.
-
-Write-root validation rejects absolute output paths, lexical traversal, and
-existing symbolic links in requested output paths. It is not hardened against
-concurrent path replacement because writes do not use dirfd/no-follow operations.
-Existing regular files may be replaced, and replacement is not guaranteed to be
-atomic.
-
-Configure an MCP host with an absolute path to a separately installed binary;
-this example is not evidence that installation has occurred from this checkout:
-
-```json
-{
-  "mcpServers": {
-    "libretexts": {
-      "command": "/opt/homebrew/bin/libretexts",
-      "args": ["serve", "--mcp"]
-    }
-  }
-}
 ```

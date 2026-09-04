@@ -36,8 +36,8 @@ func TestDescribeJSONIsCompleteVersionedCapabilityContract(t *testing.T) {
 		}
 		byName[command.Name] = command
 	}
-	if len(byName) != 8 {
-		t.Fatalf("command count = %d, want 8: %+v", len(byName), got.Commands)
+	if len(byName) != 7 {
+		t.Fatalf("command count = %d, want 7: %+v", len(byName), got.Commands)
 	}
 
 	tests := []struct {
@@ -54,7 +54,6 @@ func TestDescribeJSONIsCompleteVersionedCapabilityContract(t *testing.T) {
 		{"extract", "extract BOOK_ID_OR_URL --out DIR", "extract an entire textbook hierarchy", "extracted content files and index.json", []string{"BOOK_ID_OR_URL"}, []string{"--library", "--out", "--format", "--max-pages", "--delay"}, []string{"human"}, true, true},
 		{"pdf", "pdf BOOK_ID_OR_URL --out FILE", "download the textbook PDF", "downloaded PDF file", []string{"BOOK_ID_OR_URL"}, []string{"--library", "--out"}, []string{"human"}, true, true},
 		{"describe", "describe [--json]", "", "versioned command capability manifest", nil, []string{"--json"}, []string{"human", "json"}, false, false},
-		{"serve", "serve --mcp", "", "stdio Model Context Protocol server", nil, []string{"--mcp", "--write-root"}, []string{"mcp"}, true, true},
 	}
 	for _, tt := range tests {
 		command, ok := byName[tt.name]
@@ -77,8 +76,8 @@ func TestDescribeJSONIsCompleteVersionedCapabilityContract(t *testing.T) {
 	if optionByName(t, byName["extract"].Options, "--out").Required != true || optionByName(t, byName["extract"].Options, "--format").Default != "markdown" || !sameStrings(optionByName(t, byName["extract"].Options, "--format").Values, []string{"markdown", "md", "html", "json"}) {
 		t.Fatalf("extract option contract = %+v", byName["extract"].Options)
 	}
-	if optionByName(t, byName["search"].Options, "--limit").Default != float64(10) || optionByName(t, byName["tree"].Options, "--max-pages").Default != float64(0) || optionByName(t, byName["serve"].Options, "--mcp").Default != false || !optionByName(t, byName["serve"].Options, "--mcp").Required {
-		t.Fatalf("numeric/server defaults not preserved")
+	if optionByName(t, byName["search"].Options, "--limit").Default != float64(10) || optionByName(t, byName["tree"].Options, "--max-pages").Default != float64(0) {
+		t.Fatalf("numeric defaults not preserved")
 	}
 }
 
@@ -136,10 +135,6 @@ func TestDescribeJSONDeclaresEveryOptionDefaultRequiredMarkerAndValueSet(t *test
 			{"--out", "string", "", false, nil},
 		},
 		"describe": {{"--json", "boolean", false, false, nil}},
-		"serve": {
-			{"--mcp", "boolean", false, true, nil},
-			{"--write-root", "string", "", false, nil},
-		},
 	}
 	for _, command := range got.Commands {
 		want, ok := expected[command.Name]

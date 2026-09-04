@@ -206,8 +206,6 @@ func runWithOptions(ctx context.Context, args []string, options globalOptions) e
 		return cmdExtractWithOptions(ctx, c, args[1:], options, os.Stderr)
 	case "pdf":
 		return cmdPDFWithOptions(ctx, c, args[1:], options)
-	case "serve":
-		return cmdServe(ctx, c, args[1:])
 	case "help", "-h", "--help":
 		usage()
 		return nil

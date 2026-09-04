@@ -8,8 +8,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-
-	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 // stubClient serves a fixed body per request without recording requests, so it
@@ -102,8 +100,9 @@ func TestPartialMetaServesAsFallbackWhenAPIFails(t *testing.T) {
 	}
 }
 
-// The MCP server shares one client across concurrently dispatched tool calls.
-// Run with -race.
+// Nothing drives the client concurrently today, but the caches are shared for
+// the life of a process and a parallel walk would be a natural addition. Run
+// with -race.
 func TestCacheIsSafeForConcurrentUse(t *testing.T) {
 	c := stubClient(func(req *http.Request) (int, string) {
 		return http.StatusOK, `{"@id":"12345","title":"Test","uri.ui":"https://chem.libretexts.org/p","body":"<p>x</p>"}`
@@ -190,7 +189,7 @@ func TestMalformedFlagsExitOneThroughTheErrorEnvelope(t *testing.T) {
 		{name: "undefined flag", args: []string{"search", "--bogus", "foo"}},
 		{name: "invalid duration", args: []string{"extract", "--delay", "nope", "chem-1", "--out", "/tmp/x"}},
 		{name: "wrong type", args: []string{"tree", "--max-pages", "abc", "chem-1"}},
-		{name: "undefined flag on serve", args: []string{"serve", "--mcp", "--bogus"}},
+		{name: "undefined flag on libraries", args: []string{"libraries", "--bogus"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var stderr strings.Builder
@@ -217,41 +216,5 @@ func TestMalformedFlagsExitOneThroughTheErrorEnvelope(t *testing.T) {
 				t.Fatalf("hint does not point anywhere useful: %q", envelope.Error.Hint)
 			}
 		})
-	}
-}
-
-func TestMCPSearchLimitUpperBound(t *testing.T) {
-	c, requests := newTestClient(t)
-	session := connectMCPForTest(t, newMCPServer(c, ""))
-	result, err := session.CallTool(context.Background(), &mcp.CallToolParams{
-		Name:      "libretexts_search_books",
-		Arguments: map[string]any{"query": "chemistry", "limit": maxSearchLimit + 1},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !result.IsError {
-		t.Fatal("limit above the cap was accepted")
-	}
-	if len(*requests) != 0 {
-		t.Fatalf("made %d upstream requests, want the check to run before any request", len(*requests))
-	}
-}
-
-func TestMCPSearchLimitAtCapIsAccepted(t *testing.T) {
-	c, requests := newTestClient(t)
-	session := connectMCPForTest(t, newMCPServer(c, ""))
-	result, err := session.CallTool(context.Background(), &mcp.CallToolParams{
-		Name:      "libretexts_search_books",
-		Arguments: map[string]any{"query": "chemistry", "limit": maxSearchLimit},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if result.IsError {
-		t.Fatalf("limit at the cap was rejected: %+v", result)
-	}
-	if got := (*requests)[0].URL.Query().Get("limit"); got != "100" {
-		t.Fatalf("request limit = %q, want %q", got, "100")
 	}
 }

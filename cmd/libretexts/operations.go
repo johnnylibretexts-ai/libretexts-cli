@@ -13,7 +13,6 @@ type extractRequest struct {
 	Identifier string
 	Library    string
 	OutputDir  string
-	WriteRoot  string
 	Format     string
 	MaxPages   int
 	Delay      time.Duration
@@ -30,7 +29,6 @@ type downloadRequest struct {
 	Identifier string
 	Library    string
 	OutputFile string
-	WriteRoot  string
 }
 
 type downloadResult struct {
@@ -144,26 +142,9 @@ func extractBook(ctx context.Context, c *client, request extractRequest) (extrac
 		return extractResult{}, err
 	}
 
-	writeRoot := ""
 	outputDir := request.OutputDir
-	if request.WriteRoot != "" {
-		writeRoot, err = resolveWriteRoot(request.WriteRoot)
-		if err != nil {
-			return extractResult{}, err
-		}
-		outputDir, err = confinedOutputPath(writeRoot, request.OutputDir)
-		if err != nil {
-			return extractResult{}, err
-		}
-	}
 	if err := os.MkdirAll(outputDir, 0o755); err != nil {
 		return extractResult{}, filesystemError(err)
-	}
-	if writeRoot != "" {
-		outputDir, err = confinedOutputPath(writeRoot, request.OutputDir)
-		if err != nil {
-			return extractResult{}, err
-		}
 	}
 
 	var index []pageMeta
@@ -177,12 +158,6 @@ func extractBook(ctx context.Context, c *client, request extractRequest) (extrac
 		item := extractedPage{Meta: meta, Content: content, Depth: depth}
 		name := fmt.Sprintf("%04d-%s.%s", count+1, slug(meta.Title), extFor(request.Format))
 		pagePath := filepath.Join(outputDir, name)
-		if writeRoot != "" {
-			pagePath, err = confinedOutputPath(writeRoot, filepath.Join(request.OutputDir, name))
-			if err != nil {
-				return err
-			}
-		}
 		if err := writeExtracted(pagePath, request.Format, item); err != nil {
 			return classifyError(err)
 		}
@@ -201,12 +176,6 @@ func extractBook(ctx context.Context, c *client, request extractRequest) (extrac
 	}
 
 	indexPath := filepath.Join(outputDir, "index.json")
-	if writeRoot != "" {
-		indexPath, err = confinedOutputPath(writeRoot, filepath.Join(request.OutputDir, "index.json"))
-		if err != nil {
-			return extractResult{}, err
-		}
-	}
 	if err := writeJSONFile(indexPath, index); err != nil {
 		return extractResult{}, classifyError(err)
 	}
@@ -236,30 +205,12 @@ func downloadPDF(ctx context.Context, c *client, request downloadRequest) (downl
 	if target == "" {
 		target = slug(meta.Title) + ".pdf"
 	}
-	requestedTarget := target
-	writeRoot := ""
-	if request.WriteRoot != "" {
-		writeRoot, err = resolveWriteRoot(request.WriteRoot)
-		if err != nil {
-			return downloadResult{}, err
-		}
-		target, err = confinedOutputPath(writeRoot, requestedTarget)
-		if err != nil {
-			return downloadResult{}, err
-		}
-	}
 	resp, err := c.fetchPDF(ctx, meta)
 	if err != nil {
 		return downloadResult{}, err
 	}
 	defer resp.Body.Close()
 
-	if writeRoot != "" {
-		target, err = confinedOutputPath(writeRoot, requestedTarget)
-		if err != nil {
-			return downloadResult{}, err
-		}
-	}
 	f, err := os.Create(target)
 	if err != nil {
 		return downloadResult{}, filesystemError(err)
