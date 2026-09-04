@@ -1,0 +1,92 @@
+openapi: 3.0.3
+info:
+  title: LibreTexts Deki API
+  version: 1.0.0
+  description: Public page, hierarchy, and content endpoints used by libretexts-cli.
+servers:
+  - url: https://{library}.libretexts.org
+    variables:
+      library:
+        default: chem
+        description: LibreTexts subject-library subdomain
+paths:
+  /@api/deki/pages/{pageID}:
+    get:
+      operationId: getPageMetadata
+      summary: Get page metadata
+      parameters:
+        - $ref: "#/components/parameters/PageID"
+        - $ref: "#/components/parameters/JSONFormat"
+      responses:
+        "200":
+          description: Page metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /@api/deki/pages/{pageID}/tree:
+    get:
+      operationId: getPageTree
+      summary: Get the complete recursive page hierarchy
+      parameters:
+        - $ref: "#/components/parameters/PageID"
+        - $ref: "#/components/parameters/JSONFormat"
+      responses:
+        "200":
+          description: Recursive page tree
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /@api/deki/pages/{pageID}/contents:
+    get:
+      operationId: getPageContents
+      summary: Get page HTML content
+      parameters:
+        - $ref: "#/components/parameters/PageID"
+        - $ref: "#/components/parameters/JSONFormat"
+      responses:
+        "200":
+          description: Page content
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /@api/deki/pages/{pageID}/subpages:
+    get:
+      operationId: listSubpages
+      summary: List direct child pages
+      parameters:
+        - $ref: "#/components/parameters/PageID"
+        - $ref: "#/components/parameters/JSONFormat"
+        - name: limit
+          in: query
+          schema:
+            type: string
+            default: all
+      responses:
+        "200":
+          description: Direct child pages
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+components:
+  parameters:
+    PageID:
+      name: pageID
+      in: path
+      required: true
+      schema:
+        type: string
+      example: "38132"
+    JSONFormat:
+      name: dream.out.format
+      in: query
+      schema:
+        type: string
+        default: json

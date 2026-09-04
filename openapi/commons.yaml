@@ -1,0 +1,157 @@
+openapi: 3.0.3
+info:
+  title: LibreTexts Commons API
+  version: 1.0.0
+  description: Public textbook catalog endpoints used by libretexts-cli.
+servers:
+  - url: https://commons.libretexts.org
+paths:
+  /api/v1/search/books-v2:
+    get:
+      operationId: searchBooks
+      summary: Search the LibreTexts textbook catalog
+      parameters:
+        - name: searchQuery
+          in: query
+          schema:
+            type: string
+        - name: library
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: sort
+          in: query
+          schema:
+            type: string
+            default: title
+      responses:
+        "200":
+          description: Matching textbooks
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookSearchResponse"
+  /api/v1/commons/libraries:
+    get:
+      operationId: listLibraries
+      summary: List LibreTexts subject libraries
+      responses:
+        "200":
+          description: LibreTexts libraries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  err:
+                    type: boolean
+                  libraries:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Library"
+  /api/v1/commons/book/{bookID}:
+    get:
+      operationId: getBook
+      summary: Get one catalog textbook
+      parameters:
+        - name: bookID
+          in: path
+          required: true
+          schema:
+            type: string
+          example: chem-38132
+      responses:
+        "200":
+          description: Textbook metadata and download links
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  err:
+                    type: boolean
+                  book:
+                    $ref: "#/components/schemas/Book"
+components:
+  schemas:
+    BookSearchResponse:
+      type: object
+      properties:
+        err:
+          type: boolean
+        numResults:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/Book"
+    Book:
+      type: object
+      required: [bookID, title, library]
+      properties:
+        bookID:
+          type: string
+        title:
+          type: string
+        author:
+          type: string
+        affiliation:
+          type: string
+        library:
+          type: string
+        subject:
+          type: string
+        license:
+          type: string
+        summary:
+          type: string
+        thumbnail:
+          type: string
+          format: uri
+        lastUpdated:
+          type: string
+        links:
+          $ref: "#/components/schemas/BookLinks"
+    BookLinks:
+      type: object
+      properties:
+        online:
+          type: string
+          format: uri
+        pdf:
+          type: string
+          format: uri
+        zip:
+          type: string
+          format: uri
+        files:
+          type: string
+          format: uri
+        lms:
+          type: string
+          format: uri
+    Library:
+      type: object
+      required: [subdomain, title]
+      properties:
+        subdomain:
+          type: string
+        title:
+          type: string
+        link:
+          type: string
+          format: uri
+        hidden:
+          type: boolean
+        syncSupported:
+          type: boolean
