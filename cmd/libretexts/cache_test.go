@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -216,5 +217,93 @@ func TestMalformedFlagsExitOneThroughTheErrorEnvelope(t *testing.T) {
 				t.Fatalf("hint does not point anywhere useful: %q", envelope.Error.Hint)
 			}
 		})
+	}
+}
+
+// The Deki fallback returns 500 for pages that simply have no rendered PDF.
+// Letting that overwrite the download service's authoritative 404 reported a
+// permanent condition as retryable, which sends an agent into a retry loop.
+func TestFetchPDFKeepsTheAuthoritativeErrorOverAFallback500(t *testing.T) {
+	c := stubClient(func(req *http.Request) (int, string) {
+		if strings.HasPrefix(req.URL.Path, "/api/v1/download/") {
+			return http.StatusNotFound, `{"msg":"not found","status":404}`
+		}
+		return http.StatusInternalServerError, "server error"
+	})
+
+	_, err := c.fetchPDF(context.Background(), pageMeta{
+		ID: "189162", Library: "chem",
+		PDF: "https://chem.libretexts.org/@api/deki/pages/189162/pdf/TitlePage.pdf",
+	})
+	assertAgentErrorCode(t, err, "PDF_UNAVAILABLE")
+	var coded *agentError
+	if !errors.As(err, &coded) {
+		t.Fatalf("error is not an agentError: %v", err)
+	}
+	if coded.Retryable {
+		t.Fatal("a page with no published PDF was reported as retryable")
+	}
+}
+
+// A transient failure from the download service should still read as retryable.
+func TestFetchPDFReportsATransientFirstFailureAsRetryable(t *testing.T) {
+	c := stubClient(func(req *http.Request) (int, string) {
+		return http.StatusInternalServerError, "server error"
+	})
+	_, err := c.fetchPDF(context.Background(), pageMeta{ID: "1", Library: "chem"})
+	var coded *agentError
+	if !errors.As(err, &coded) {
+		t.Fatalf("error is not an agentError: %v", err)
+	}
+	if coded.Code != "UPSTREAM_HTTP_ERROR" || !coded.Retryable {
+		t.Fatalf("error = %+v, want a retryable upstream error", coded)
+	}
+}
+
+func TestUnknownLibraryIsRejectedWithoutANetworkCall(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		call func(*client) error
+	}{
+		{name: "book id", call: func(c *client) error {
+			_, err := c.resolvePage(context.Background(), "zzz-1", "")
+			return err
+		}},
+		{name: "library flag", call: func(c *client) error {
+			_, err := c.resolvePage(context.Background(), "1", "zzz")
+			return err
+		}},
+		{name: "search filter", call: func(c *client) error {
+			_, err := c.searchBooks(context.Background(), "x", "zzz", 5)
+			return err
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			calls := 0
+			c := stubClient(func(req *http.Request) (int, string) {
+				calls++
+				return http.StatusOK, `{}`
+			})
+			err := tc.call(c)
+			assertAgentErrorCode(t, err, "UNKNOWN_LIBRARY")
+			var coded *agentError
+			if errors.As(err, &coded) && coded.Retryable {
+				t.Fatal("an unknown library was reported as retryable")
+			}
+			if calls != 0 {
+				t.Fatalf("made %d requests for a library that cannot exist", calls)
+			}
+		})
+	}
+}
+
+func TestKnownLibraryAcceptsEveryPublishedLibrary(t *testing.T) {
+	for _, library := range libraries {
+		if !knownLibrary(library) {
+			t.Errorf("published library %q is not accepted", library)
+		}
+	}
+	if knownLibrary("") || knownLibrary("all") {
+		t.Error("empty and \"all\" are handled by callers, not knownLibrary")
 	}
 }

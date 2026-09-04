@@ -425,6 +425,9 @@ func (c *client) searchBooks(ctx context.Context, query, library string, limit i
 	if limit < 0 {
 		return nil, newAgentError("INVALID_ARGUMENT", fmt.Sprintf("limit must be non-negative, got %d", limit), "Provide a limit of zero or greater.", false, nil)
 	}
+	if library != "" && library != "all" && !knownLibrary(library) {
+		return nil, unknownLibraryError(library)
+	}
 	params := url.Values{}
 	params.Set("limit", strconv.Itoa(limit))
 	params.Set("page", "1")
@@ -457,11 +460,17 @@ func (c *client) resolvePage(ctx context.Context, input, library string) (pageMe
 		if library != "" && library != bookLibrary {
 			return pageMeta{}, newAgentError("LIBRARY_CONFLICT", fmt.Sprintf("book ID library %q conflicts with --library %q", bookLibrary, library), "Use the library encoded in the book ID or supply a matching --library value.", false, nil)
 		}
+		if !knownLibrary(bookLibrary) {
+			return pageMeta{}, unknownLibraryError(bookLibrary)
+		}
 		return c.pageMeta(ctx, bookLibrary, pageID)
 	}
 	if _, err := strconv.Atoi(input); err == nil {
 		if library == "" {
 			return pageMeta{}, newAgentError("LIBRARY_REQUIRED", "--library is required with numeric page IDs", "Retry with --library followed by a LibreTexts library name, such as chem.", false, nil)
+		}
+		if !knownLibrary(library) {
+			return pageMeta{}, unknownLibraryError(library)
 		}
 		return c.pageMeta(ctx, library, input)
 	}
@@ -904,13 +913,22 @@ func (c *client) fetchPDF(ctx context.Context, meta pageMeta) (*http.Response, e
 	for _, candidate := range candidates {
 		resp, err := c.getLarge(ctx, candidate)
 		if err != nil {
-			lastErr = classifyError(err)
+			if lastErr == nil {
+				lastErr = classifyError(err)
+			}
 			continue
 		}
 		if resp.StatusCode >= 200 && resp.StatusCode <= 299 {
 			return resp, nil
 		}
 		resp.Body.Close()
+		// Candidates are ordered by authority, so the first failure is the one
+		// worth reporting. The Deki fallback returns 500 for pages that simply
+		// have no PDF, and letting that overwrite the download service's 404
+		// would report a permanent condition as retryable.
+		if lastErr != nil {
+			continue
+		}
 		if resp.StatusCode == http.StatusNotFound {
 			lastErr = newAgentError("PDF_UNAVAILABLE", fmt.Sprintf("no PDF is published for %s", cacheKey(meta.Library, meta.ID)), "LibreTexts renders PDFs for books and major sections, not every leaf page. Retry with a book or section root, which libretexts tree lists at the top.", false, nil)
 			continue
@@ -1049,6 +1067,22 @@ func asString(v any) string {
 	default:
 		return fmt.Sprint(x)
 	}
+}
+
+// knownLibrary reports whether name is one of the LibreTexts content libraries
+// the libraries command publishes. Anything else resolves to a host that does
+// not exist, which would otherwise surface as a retryable network error.
+func knownLibrary(name string) bool {
+	for _, library := range libraries {
+		if library == name {
+			return true
+		}
+	}
+	return false
+}
+
+func unknownLibraryError(name string) *agentError {
+	return newAgentError("UNKNOWN_LIBRARY", fmt.Sprintf("unknown LibreTexts library %q", name), fmt.Sprintf("Use one of: %s.", strings.Join(libraries, ", ")), false, nil)
 }
 
 func firstNonEmpty(values ...string) string {

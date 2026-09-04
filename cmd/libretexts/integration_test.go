@@ -12,6 +12,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -136,11 +137,36 @@ func TestLivePDFEndpointServesBooks(t *testing.T) {
 }
 
 // Pages with no rendered PDF must report PDF_UNAVAILABLE rather than a
-// misleading upstream error.
+// misleading upstream error. This resolves the page first, exactly as the pdf
+// command does, so meta.PDF is populated and the Deki fallback is exercised.
+// An earlier version constructed pageMeta directly, skipped the fallback, and
+// missed a bug where the fallback's 500 masked the authoritative 404.
 func TestLivePDFUnavailableForLeafPage(t *testing.T) {
 	ctx, c := liveContext(t)
-	_, err := c.fetchPDF(ctx, pageMeta{ID: "189162", Library: liveLibrary})
+	meta, err := c.resolvePage(ctx, "chem-189162", "")
+	if err != nil {
+		t.Fatalf("resolving the leaf page failed: %v", err)
+	}
+	if meta.PDF == "" {
+		t.Fatal("fixture no longer advertises a Deki PDF URL, so the fallback is not covered")
+	}
+
+	_, err = c.fetchPDF(ctx, meta)
 	assertAgentErrorCode(t, err, "PDF_UNAVAILABLE")
+	var coded *agentError
+	if !errors.As(err, &coded) {
+		t.Fatalf("error is not an agentError: %v", err)
+	}
+	if coded.Retryable {
+		t.Fatal("a page with no published PDF was reported as retryable")
+	}
+}
+
+// An unknown library must fail immediately rather than as a DNS error.
+func TestLiveUnknownLibraryFailsFast(t *testing.T) {
+	ctx, c := liveContext(t)
+	_, err := c.resolvePage(ctx, "zzz-1", "")
+	assertAgentErrorCode(t, err, "UNKNOWN_LIBRARY")
 }
 
 // Downloads the smallest published PDF end to end, so path handling and the
