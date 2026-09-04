@@ -197,7 +197,7 @@ func TestMCPPublishedInputSchemasDescribeDefaultsRangesAndWritePaths(t *testing.
 	}
 	want := map[string]map[string]string{
 		"libretexts_search_books": {
-			"limit": "Maximum results; defaults to 10 when omitted; must be 0 or greater.",
+			"limit": "Maximum results; defaults to 10 when omitted; must be from 0 through 100.",
 		},
 		"libretexts_get_page": {
 			"content":   "Content representation: text (default), html, or metadata. Metadata rejects offset and max_chars; make separate calls for text and HTML.",

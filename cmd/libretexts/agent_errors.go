@@ -83,20 +83,21 @@ func extractGlobalFlags(args []string) ([]string, globalOptions) {
 	return filtered, options
 }
 
+// newCommandFlagSet always continues on error. flag.ExitOnError would call
+// os.Exit(2) from inside the flag package, skipping the error envelope and
+// returning a different exit code than every other failure.
 func newCommandFlagSet(name string, jsonErrors bool) *flag.FlagSet {
-	handling := flag.ExitOnError
-	if jsonErrors {
-		handling = flag.ContinueOnError
-	}
-	fs := flag.NewFlagSet(name, handling)
-	if jsonErrors {
-		fs.SetOutput(io.Discard)
-	}
+	fs := flag.NewFlagSet(name, flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
 	return fs
 }
 
-func invalidArgumentError(err error) *agentError {
-	return newAgentError("INVALID_ARGUMENT", err.Error(), "Check the command arguments and retry.", false, err)
+func invalidArgumentError(command string, err error) *agentError {
+	hint := "Check the command arguments and retry."
+	if command != "" {
+		hint = fmt.Sprintf("Run libretexts describe --json to list the valid options for %s.", command)
+	}
+	return newAgentError("INVALID_ARGUMENT", err.Error(), hint, false, err)
 }
 
 func writeCLIError(w io.Writer, err error, jsonErrors bool) error {

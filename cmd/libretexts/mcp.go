@@ -14,12 +14,16 @@ import (
 
 const cliVersion = "0.1"
 
+// maxSearchLimit caps how many catalog records one tool call may return, so a
+// model cannot request a result set that swamps its own context.
+const maxSearchLimit = 100
+
 type emptyToolInput struct{}
 
 type searchBooksInput struct {
 	Query   string `json:"query" jsonschema:"textbook search query"`
 	Library string `json:"library,omitempty" jsonschema:"LibreTexts library host, for example chem"`
-	Limit   *int   `json:"limit,omitempty" jsonschema:"Maximum results; defaults to 10 when omitted; must be 0 or greater."`
+	Limit   *int   `json:"limit,omitempty" jsonschema:"Maximum results; defaults to 10 when omitted; must be from 0 through 100."`
 }
 
 type pageToolInput struct {
@@ -75,7 +79,7 @@ func cmdServe(ctx context.Context, c *client, args []string) error {
 	mcpMode := fs.Bool("mcp", false, "serve the Model Context Protocol over stdio")
 	writeRootArg := fs.String("write-root", "", "enable file-writing MCP tools within this directory")
 	if err := fs.Parse(args); err != nil {
-		return invalidArgumentError(err)
+		return invalidArgumentError("serve", err)
 	}
 	if fs.NArg() != 0 {
 		return newAgentError("INVALID_ARGUMENT", "serve does not accept positional arguments", "Use serve --mcp with an optional --write-root directory.", false, nil)
@@ -107,6 +111,9 @@ func newMCPServer(c *client, writeRoot string) *mcp.Server {
 			limit := 10
 			if input.Limit != nil {
 				limit = *input.Limit
+			}
+			if limit < 0 || limit > maxSearchLimit {
+				return nil, searchBooksOutput{}, mcpToolError(newAgentError("INVALID_ARGUMENT", fmt.Sprintf("limit must be between 0 and %d, got %d", maxSearchLimit, limit), fmt.Sprintf("Provide a limit from 0 through %d.", maxSearchLimit), false, nil))
 			}
 			books, err := c.searchBooks(ctx, input.Query, input.Library, limit)
 			if err != nil {

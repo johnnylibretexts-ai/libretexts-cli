@@ -2,11 +2,14 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 // stubClient serves a fixed body per request without recording requests, so it
@@ -174,5 +177,81 @@ func TestFetchPDFPrefersDownloadServiceAndFallsBack(t *testing.T) {
 func TestBookDownloadURL(t *testing.T) {
 	if got, want := bookDownloadURL("chem", "21927"), "https://downloads.libretexts.org/api/v1/download/chem-21927/pdf"; got != want {
 		t.Fatalf("bookDownloadURL() = %q, want %q", got, want)
+	}
+}
+
+// flag.ExitOnError used to call os.Exit(2) from inside the flag package for
+// these, skipping the error envelope entirely.
+func TestMalformedFlagsExitOneThroughTheErrorEnvelope(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		args []string
+	}{
+		{name: "undefined flag", args: []string{"search", "--bogus", "foo"}},
+		{name: "invalid duration", args: []string{"extract", "--delay", "nope", "chem-1", "--out", "/tmp/x"}},
+		{name: "wrong type", args: []string{"tree", "--max-pages", "abc", "chem-1"}},
+		{name: "undefined flag on serve", args: []string{"serve", "--mcp", "--bogus"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var stderr strings.Builder
+			if code := execute(context.Background(), tc.args, &stderr); code != 1 {
+				t.Fatalf("exit code = %d, want 1", code)
+			}
+			if !strings.HasPrefix(stderr.String(), "error: ") {
+				t.Fatalf("stderr = %q, want the plain error prefix", stderr.String())
+			}
+
+			stderr.Reset()
+			args := append([]string{"--json-errors"}, tc.args...)
+			if code := execute(context.Background(), args, &stderr); code != 1 {
+				t.Fatalf("--json-errors exit code = %d, want 1", code)
+			}
+			var envelope errorEnvelope
+			if err := json.Unmarshal([]byte(stderr.String()), &envelope); err != nil {
+				t.Fatalf("stderr is not one JSON object: %q", stderr.String())
+			}
+			if envelope.OK || envelope.Error.Code != "INVALID_ARGUMENT" {
+				t.Fatalf("envelope = %+v", envelope)
+			}
+			if !strings.Contains(envelope.Error.Hint, "describe --json") {
+				t.Fatalf("hint does not point anywhere useful: %q", envelope.Error.Hint)
+			}
+		})
+	}
+}
+
+func TestMCPSearchLimitUpperBound(t *testing.T) {
+	c, requests := newTestClient(t)
+	session := connectMCPForTest(t, newMCPServer(c, ""))
+	result, err := session.CallTool(context.Background(), &mcp.CallToolParams{
+		Name:      "libretexts_search_books",
+		Arguments: map[string]any{"query": "chemistry", "limit": maxSearchLimit + 1},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.IsError {
+		t.Fatal("limit above the cap was accepted")
+	}
+	if len(*requests) != 0 {
+		t.Fatalf("made %d upstream requests, want the check to run before any request", len(*requests))
+	}
+}
+
+func TestMCPSearchLimitAtCapIsAccepted(t *testing.T) {
+	c, requests := newTestClient(t)
+	session := connectMCPForTest(t, newMCPServer(c, ""))
+	result, err := session.CallTool(context.Background(), &mcp.CallToolParams{
+		Name:      "libretexts_search_books",
+		Arguments: map[string]any{"query": "chemistry", "limit": maxSearchLimit},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.IsError {
+		t.Fatalf("limit at the cap was rejected: %+v", result)
+	}
+	if got := (*requests)[0].URL.Query().Get("limit"); got != "100" {
+		t.Fatalf("request limit = %q, want %q", got, "100")
 	}
 }

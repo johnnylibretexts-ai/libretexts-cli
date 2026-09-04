@@ -228,7 +228,7 @@ func cmdLibrariesWithOptions(args []string, options globalOptions) error {
 	fs := newCommandFlagSet("libraries", options.JSONErrors)
 	jsonOut := fs.Bool("json", false, "emit JSON")
 	if err := parseCommandFlags(fs, args); err != nil {
-		return invalidArgumentError(err)
+		return invalidArgumentError(fs.Name(), err)
 	}
 	if *jsonOut {
 		return writeJSON(os.Stdout, libraries)
@@ -249,7 +249,7 @@ func cmdSearchWithOptions(ctx context.Context, c *client, args []string, options
 	limit := fs.Int("limit", 10, "maximum results")
 	jsonOut := fs.Bool("json", false, "emit JSON")
 	if err := parseCommandFlags(fs, args); err != nil {
-		return invalidArgumentError(err)
+		return invalidArgumentError(fs.Name(), err)
 	}
 	if fs.NArg() == 0 {
 		return newAgentError("MISSING_ARGUMENT", "search requires a query", "Provide a search query after the search command.", false, nil)
@@ -288,7 +288,7 @@ func cmdPageWithOptions(ctx context.Context, c *client, args []string, options g
 	maxChars := fs.Int("max-chars", 0, "maximum Unicode characters returned")
 	offset := fs.Int("offset", 0, "Unicode character offset for a bounded content stream")
 	if err := parseCommandFlags(fs, args); err != nil {
-		return invalidArgumentError(err)
+		return invalidArgumentError(fs.Name(), err)
 	}
 	if fs.NArg() != 1 {
 		return newAgentError("MISSING_ARGUMENT", "page requires BOOK_ID_OR_URL", "Provide one LibreTexts book ID or URL.", false, nil)
@@ -340,7 +340,7 @@ func cmdTreeWithOptions(ctx context.Context, c *client, args []string, options g
 	maxPages := fs.Int("max-pages", 0, "stop after N pages, 0 means no limit")
 	jsonOut := fs.Bool("json", false, "emit JSON")
 	if err := parseCommandFlags(fs, args); err != nil {
-		return invalidArgumentError(err)
+		return invalidArgumentError(fs.Name(), err)
 	}
 	if fs.NArg() != 1 {
 		return newAgentError("MISSING_ARGUMENT", "tree requires BOOK_ID_OR_URL", "Provide one LibreTexts book ID or URL.", false, nil)
@@ -370,7 +370,7 @@ func cmdExtractWithOptions(ctx context.Context, c *client, args []string, option
 	maxPages := fs.Int("max-pages", 0, "stop after N pages, 0 means no limit")
 	delay := fs.Duration("delay", 100*time.Millisecond, "delay between content requests")
 	if err := parseCommandFlags(fs, args); err != nil {
-		return invalidArgumentError(err)
+		return invalidArgumentError(fs.Name(), err)
 	}
 	if fs.NArg() != 1 {
 		return newAgentError("MISSING_ARGUMENT", "extract requires BOOK_ID_OR_URL", "Provide one LibreTexts book ID or URL.", false, nil)
@@ -406,7 +406,7 @@ func cmdPDFWithOptions(ctx context.Context, c *client, args []string, options gl
 	lib := fs.String("library", "", "LibreTexts library host for numeric IDs")
 	out := fs.String("out", "", "output PDF path")
 	if err := parseCommandFlags(fs, args); err != nil {
-		return invalidArgumentError(err)
+		return invalidArgumentError(fs.Name(), err)
 	}
 	if fs.NArg() != 1 {
 		return newAgentError("MISSING_ARGUMENT", "pdf requires BOOK_ID_OR_URL", "Provide one LibreTexts book ID or URL.", false, nil)
@@ -1062,12 +1062,22 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
+// compact collapses runs of whitespace and truncates to n characters. It counts
+// runes rather than bytes, so multi-byte text is never split mid-codepoint.
 func compact(s string, n int) string {
 	s = strings.Join(strings.Fields(s), " ")
-	if len(s) <= n {
+	if n <= 0 {
+		return ""
+	}
+	runes := []rune(s)
+	if len(runes) <= n {
 		return s
 	}
-	return s[:n-3] + "..."
+	const ellipsis = "..."
+	if n <= len(ellipsis) {
+		return string(runes[:n])
+	}
+	return string(runes[:n-len(ellipsis)]) + ellipsis
 }
 
 func parseCommandFlags(fs *flag.FlagSet, args []string) error {

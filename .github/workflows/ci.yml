@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  # The integration job talks to live LibreTexts services. A nightly run catches
+  # an endpoint that has moved or gone dead even when nobody is pushing.
+  schedule:
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Check formatting
+        run: |
+          unformatted="$(gofmt -l cmd/libretexts)"
+          if [ -n "$unformatted" ]; then
+            echo "These files need gofmt:"
+            printf '%s\n' "$unformatted"
+            exit 1
+          fi
+
+      - name: Vet
+        run: |
+          go vet ./...
+          go vet -tags=integration ./...
+
+      - name: Unit tests (race detector)
+        run: go test ./... -race -count=1
+
+      - name: Build
+        run: go build -o libretexts ./cmd/libretexts
+
+  integration:
+    name: Live integration tests
+    runs-on: ubuntu-latest
+    # Pull requests from forks should not be gated on third-party availability.
+    if: github.event_name != 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Integration tests against live LibreTexts
+        run: go test ./... -tags=integration -count=1 -v
+        timeout-minutes: 10
