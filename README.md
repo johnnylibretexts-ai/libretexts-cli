@@ -1,6 +1,6 @@
 # libretexts-cli
 
-[![CI](https://github.com/johnnylibretexts/libretexts-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/johnnylibretexts/libretexts-cli/actions/workflows/ci.yml)
+[![CI](https://github.com/johnnylibretexts-ai/libretexts-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/johnnylibretexts-ai/libretexts-cli/actions/workflows/ci.yml)
 
 Search and extract open textbook content from [LibreTexts](https://libretexts.org)
 from the command line.
@@ -27,7 +27,7 @@ grab the official PDF.
 ## Install
 
 ```bash
-go install github.com/johnnylibretexts/libretexts-cli/cmd/libretexts@latest
+go install github.com/johnnylibretexts-ai/libretexts-cli/cmd/libretexts@latest
 ```
 
 Requires Go 1.26.4 or newer. To build from a checkout instead:
