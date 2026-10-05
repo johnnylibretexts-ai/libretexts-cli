@@ -9,9 +9,7 @@
 coverage.txt
 
 # Local tool scratch output
-/graphify-out/
 /.superpowers/
-.graphify_uncached.txt
 
 # OS noise
 .DS_Store
